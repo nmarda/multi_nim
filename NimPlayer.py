@@ -44,6 +44,32 @@ def createLines(win):
 def clickedBox(click):
 	return NUM_COLS * SQUARE_WIDTH + 10 <= click.getX() <= NUM_COLS * SQUARE_WIDTH + 90 and 10 <= click.getY() <= 90
 
+def doTurn(circles, turn):
+	newBoard = []
+	for col in circles:
+		newBoard.append(circles[:])
+	for column in range(len(circles)):
+		for circle in circles[column]:
+			if circle in turn:
+				newBoard[column].remove(circle)
+	return newBoard
+
+def performComputerTurn(circles):
+	comp_moves = getLegalMoves(circles)
+	for move in comp_moves: #if this loop runs 0 times, no legal moves for computer (so loss)
+		newBoard = doTurn(circles, move)
+		human_moves = getLegalMoves(newBoard)
+		alwaysWins = True
+		for human in human_moves: # if no human moves, then it's a win for the computer
+			human_board = doTurn(newBoard, human)
+			isWin, _ = performComputerTurn(human_board):
+			if not isWin:
+				alwaysWins = False
+				break
+		if alwaysWins:
+			return True, move
+	return False, None
+
 def playGame():
 	win = GraphWin("Nim Player Interface", SCREEN_WIDTH, SCREEN_HEIGHT)
 	createLines(win)
@@ -79,6 +105,8 @@ def playGame():
 					player_text.setText("Player 1's turn" if player_1_turn else "Player 2's turn")
 					row_selection = -1
 					col_selection = -1
+					performComputerTurn(circles)
+					player_1_turn = True
 			else:
 				print(len(circles))
 				for column in range(len(circles)):
