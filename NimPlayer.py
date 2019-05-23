@@ -2,6 +2,7 @@ from graphics import *
 from math import *
 import time
 import numpy as np
+import itertools
 
 STONE_DIAMETER = 40
 STONE_COLOR = "blue"
@@ -70,6 +71,7 @@ def playGame():
 
 		while circles != [[] for i in range(NUM_COLS)]:
 			print(circles)
+			getLegalMoves(circles)
 			click = win.getMouse()
 			if clickedBox(click):
 				if tiles_removed != 0:
@@ -109,6 +111,91 @@ def playGame():
 			player_1_win_text.setText("Player 1 wins: " + str(player_1_wins))
 	win.getMouse()
 	win.close()
+
+def circToArrayIndex(circle):
+	return int((circle.getCenter().getY())/SQUARE_WIDTH), int((circle.getCenter().getX() - SQUARE_WIDTH/2.0)/SQUARE_WIDTH)
+
+def arrayIndexToCirc(row, col, circles):
+	for entry in circles[col]:
+		row_i, col_i = circToArrayIndex(entry)
+		print(row_i, col_i)
+		if row_i == row:
+			return entry
+	return None
+
+def getIndicatorArray(circles):
+	array = [[0] * NUM_ROWS for i in range(NUM_COLS)]
+	for column in circles:
+		for entry in column:
+			row, col = circToArrayIndex(entry)
+			array[col][row] = 1
+	return(array)	
+
+def getLegalMoves(circles):
+	array = getIndicatorArray(circles)
+	output = []
+	#EVERY ROW
+	for k in range(len(array[0])):
+		has_one = []
+		for i in range(len(array)):
+			if array[i][k] == 1:
+				has_one.append(i)
+		row_options = []
+		for r in range(1, len(has_one) + 1):
+			for combo in itertools.combinations(has_one, r):
+				appending_array = [0]*NUM_COLS
+				# print(combo)
+				for i in combo:
+					appending_array[i] = 1
+				# print(appending_array)
+				row_options.append(appending_array)
+		for entry in row_options:
+			output_array = [[0] * NUM_ROWS for i in range(NUM_COLS)]
+			for i in range(len(output_array[k])):
+				output_array[i][k] = entry[i]
+			output.append(output_array)
+	#EVERY COLUMN
+	for k in range(len(array)):
+		has_one = []
+		for i in range(len(array[k])):
+			if array[k][i] == 1:
+				has_one.append(i)
+		col_options = []
+		for r in range(1, len(has_one) + 1):
+			for combo in itertools.combinations(has_one, r):
+				appending_array = [0]*NUM_ROWS
+				# print(combo)
+				for i in combo:
+					appending_array[i] = 1
+				# print(appending_array)
+				col_options.append(appending_array)
+		for entry in col_options:
+			output_array = [[0] * NUM_ROWS for i in range(NUM_COLS)]
+			for i in range(len(output_array[k])):
+				output_array[k][i] = entry[i]
+			output.append(output_array)
+	output_pruned = []
+	for entry in output:
+		if entry not in output_pruned:
+			output_pruned.append(entry)
+	print(output_pruned)
+	output_final = []
+	for entry in output_pruned:
+		append_array = []
+		for j in range(len(entry)):
+			for i in range(len(entry[j])):
+				if entry[j][i] == 1:
+					append_array.append(arrayIndexToCirc(i, j, circles))
+		output_final.append(append_array)
+	print(output_final)
+
+
+	#create indicator array
+
+
+
+# def doTurn(circles, circles):
+
 
 if __name__ == "__main__":
 	playGame()
