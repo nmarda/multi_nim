@@ -8,8 +8,8 @@ from random import *
 STONE_DIAMETER = 40
 STONE_COLOR = "blue"
 SQUARE_WIDTH = STONE_DIAMETER + 10
-NUM_ROWS = 4
-NUM_COLS = 2
+NUM_ROWS = 2
+NUM_COLS = 4
 SCREEN_WIDTH = NUM_COLS * SQUARE_WIDTH + 100
 SCREEN_HEIGHT = NUM_ROWS * SQUARE_WIDTH + 100
 COMPUTER_FIRST = False
@@ -245,7 +245,7 @@ def getLegalMoves(circles):
 				row_options.append(appending_array)
 		for entry in row_options:
 			output_array = [[0] * NUM_ROWS for i in range(NUM_COLS)]
-			for i in range(len(output_array[k])):
+			for i in range(len(output_array)):
 				output_array[i][k] = entry[i]
 			output.append(output_array)
 	# print(output)
