@@ -3,14 +3,16 @@ from math import *
 import time
 import numpy as np
 import itertools
+from random import *
 
 STONE_DIAMETER = 40
 STONE_COLOR = "blue"
 SQUARE_WIDTH = STONE_DIAMETER + 10
 NUM_ROWS = 4
-NUM_COLS = 4
+NUM_COLS = 2
 SCREEN_WIDTH = NUM_COLS * SQUARE_WIDTH + 100
 SCREEN_HEIGHT = NUM_ROWS * SQUARE_WIDTH + 100
+COMPUTER_FIRST = False
 
 def clickedCircle(circ, click):
 	center = circ.getCenter()
@@ -45,31 +47,59 @@ def createLines(win):
 def clickedBox(click):
 	return NUM_COLS * SQUARE_WIDTH + 10 <= click.getX() <= NUM_COLS * SQUARE_WIDTH + 90 and 10 <= click.getY() <= 90
 
+def circleCount(circles):
+	count = 0
+	for col in circles:
+		count += len(col)
+	return count
+
 def doTurn(circles, turn):
 	newBoard = []
-	for col in circles:
-		newBoard.append(circles[:])
+	for col in range(len(circles)):
+		newBoard.append(circles[col][:])
 	for column in range(len(circles)):
 		for circle in circles[column]:
 			if circle in turn:
 				newBoard[column].remove(circle)
 	return newBoard
 
-def performComputerTurn(circles):
+def performComputerTurnHelper(circles):
 	comp_moves = getLegalMoves(circles)
+	# print(circleCount(circles))
+	# print("Current Board:", circles)
+	# print("Possible moves:", comp_moves)
 	for move in comp_moves: #if this loop runs 0 times, no legal moves for computer (so loss)
 		newBoard = doTurn(circles, move)
 		human_moves = getLegalMoves(newBoard)
+		# print("board for human:", newBoard)
+		# print("legal human moves:", human_moves)
 		alwaysWins = True
 		for human in human_moves: # if no human moves, then it's a win for the computer
 			human_board = doTurn(newBoard, human)
-			isWin, _ = performComputerTurn(human_board):
+			isWin, _ = performComputerTurnHelper(human_board)
+			# print("examining human move:", human)
+			# print("results in win for computer:", isWin)
+			# print("on board", human_board)
 			if not isWin:
 				alwaysWins = False
 				break
 		if alwaysWins:
 			return True, move
 	return False, None
+
+def performComputerTurn(circles, winner_predict, win):
+	loading = Text(Point(NUM_COLS * SQUARE_WIDTH + 50, 140), "Thinking...")
+	loading.draw(win)
+	for legalMove in getLegalMoves(circles):
+		print(legalMove)
+	isWin, moves = performComputerTurnHelper(circles)
+	loading.undraw()
+	if isWin:
+		winner_predict.setText("Computer will win!")
+	else:
+		winner_predict.setText("Player will win!")	
+	return isWin, moves
+
 
 def playGame():
 	win = GraphWin("Nim Player Interface", SCREEN_WIDTH, SCREEN_HEIGHT)
@@ -78,25 +108,45 @@ def playGame():
 	endTurn = Rectangle(Point(NUM_COLS * SQUARE_WIDTH + 10, 90), Point(NUM_COLS * SQUARE_WIDTH + 90, 10))
 	endTurn.setFill("red")
 	endTurn.draw(win)
-	player_text = Text(Point(NUM_COLS * SQUARE_WIDTH + 50, 50), "Player 1's turn")
+	player_text = Text(Point(NUM_COLS * SQUARE_WIDTH + 50, 50), "Player's turn")
 	player_text.draw(win)
+	winner_predict = Text(Point(NUM_COLS * SQUARE_WIDTH + 50, 110), "Who's gonna win?")
+	winner_predict.draw(win)
 	player_1_wins = 0
 	player_2_wins = 0
-	player_1_win_text = Text(Point(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 67), "Player 1 wins: 0")
+	player_1_win_text = Text(Point(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 67), "Player wins: 0")
 	player_1_win_text.draw(win)
-	player_2_win_text = Text(Point(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 33), "Player 2 wins: 0")
+	player_2_win_text = Text(Point(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 33), "Computer wins: 0")
 	player_2_win_text.draw(win)
 	while(True):
+		winner_predict.setText("Who will win?")
 		circles = createCircles(win)
 		player_1_turn = True
-		player_text.setText("Player 1's turn")
+		player_text.setText("Player's turn")
 		endTurn.setFill("red")
 		tiles_removed = 0
 		row_selection = -1
 		col_selection = -1
+		if COMPUTER_FIRST:
+			comp_win, moves = performComputerTurn(circles, winner_predict, win)
+			if comp_win:
+				for move in moves:
+					row, col = circToArrayIndex(move)
+					circles[col].remove(move)
+					move.undraw()
+			else:
+				random_col = -1
+				while random_col == -1 or circles[random_col] == []:
+					random_col = randint(0, NUM_COLS - 1)
+				toRemove = choice(circles[random_col])
+				circles[random_col].remove(toRemove)
+				toRemove.undraw()
+			if circles != [[] for _ in range(NUM_COLS)]:
+				player_1_turn = True
+				player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
 
 		while circles != [[] for i in range(NUM_COLS)]:
-			print(circles)
+			# print(circles)
 			getLegalMoves(circles)
 			click = win.getMouse()
 			if clickedBox(click):
@@ -104,13 +154,29 @@ def playGame():
 					tiles_removed = 0
 					player_1_turn = not player_1_turn
 					endTurn.setFill("red")
-					player_text.setText("Player 1's turn" if player_1_turn else "Player 2's turn")
+					player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
 					row_selection = -1
 					col_selection = -1
-					performComputerTurn(circles)
-					player_1_turn = True
+					comp_win, moves = performComputerTurn(circles, winner_predict, win)
+					if comp_win:
+						for move in moves:
+							row, col = circToArrayIndex(move)
+							circles[col].remove(move)
+							move.undraw()
+					else:
+						random_col = -1
+						while random_col == -1 or circles[random_col] == []:
+							random_col = randint(0, NUM_COLS - 1)
+						toRemove = choice(circles[random_col])
+						circles[random_col].remove(toRemove)
+						toRemove.undraw()
+
+					if circles != [[] for _ in range(NUM_COLS)]:
+						player_1_turn = True
+						player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
+
 			else:
-				print(len(circles))
+				# print(len(circles))
 				for column in range(len(circles)):
 					for circ in circles[column]:
 						if clickedCircle(circ, click):
@@ -132,11 +198,11 @@ def playGame():
 							circ.undraw()
 							break
 		if player_1_turn:
-			player_2_wins += 1
-			player_2_win_text.setText("Player 2 wins: " + str(player_2_wins))
-		else:
 			player_1_wins += 1
-			player_1_win_text.setText("Player 1 wins: " + str(player_1_wins))
+			player_1_win_text.setText("Player wins: " + str(player_1_wins))
+		else:
+			player_2_wins += 1
+			player_2_win_text.setText("Computer wins: " + str(player_2_wins))
 	win.getMouse()
 	win.close()
 
@@ -146,7 +212,7 @@ def circToArrayIndex(circle):
 def arrayIndexToCirc(row, col, circles):
 	for entry in circles[col]:
 		row_i, col_i = circToArrayIndex(entry)
-		print(row_i, col_i)
+		# print(row_i, col_i)
 		if row_i == row:
 			return entry
 	return None
@@ -182,6 +248,7 @@ def getLegalMoves(circles):
 			for i in range(len(output_array[k])):
 				output_array[i][k] = entry[i]
 			output.append(output_array)
+	# print(output)
 	#EVERY COLUMN
 	for k in range(len(array)):
 		has_one = []
@@ -206,7 +273,7 @@ def getLegalMoves(circles):
 	for entry in output:
 		if entry not in output_pruned:
 			output_pruned.append(entry)
-	print(output_pruned)
+	# print(output_pruned)
 	output_final = []
 	for entry in output_pruned:
 		append_array = []
@@ -215,8 +282,12 @@ def getLegalMoves(circles):
 				if entry[j][i] == 1:
 					append_array.append(arrayIndexToCirc(i, j, circles))
 		output_final.append(append_array)
-	print(output_final)
-
+	if [] in output_final:
+		output_final.remove([])
+	# for move in output_final:
+		# print(move)
+	# time.sleep(1)
+	return output_final
 
 	#create indicator array
 
