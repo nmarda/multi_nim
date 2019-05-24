@@ -8,11 +8,11 @@ from random import *
 STONE_DIAMETER = 40
 STONE_COLOR = "blue"
 SQUARE_WIDTH = STONE_DIAMETER + 10
-NUM_ROWS = 2
+NUM_ROWS = 3
 NUM_COLS = 4
 SCREEN_WIDTH = NUM_COLS * SQUARE_WIDTH + 100
 SCREEN_HEIGHT = NUM_ROWS * SQUARE_WIDTH + 100
-COMPUTER_FIRST = False
+COMPUTER_FIRST = True
 
 def clickedCircle(circ, click):
 	center = circ.getCenter()
@@ -65,13 +65,23 @@ def doTurn(circles, turn):
 
 winForCurrPlayer = {} # dict from board to (first player winning, winning move if True)
 
+def toString(circles):
+	ans = str(NUM_ROWS)
+	for col in getIndicatorArray(circles):
+		for circ in col:
+			ans += str(circ)
+	return ans
+
 def performComputerTurnHelper(circles):
+	# winForCurrPlayer.clear() #uncomment this to stop memoization
 	comp_moves = getLegalMoves(circles)
-	if circles in winForCurrPlayer.keys():
-		return winForCurrPlayer[circles]
+	circle_indicator = toString(circles)
+	if circle_indicator in winForCurrPlayer.keys():
+		# print(winForCurrPlayer[circle_indicator])
+		return winForCurrPlayer[circle_indicator]
 	# print(circleCount(circles))
 	# print("Current Board:", circles)
-	# print("Possible moves:", comp_moves)
+	# print("Possible moves:", comp_moves)	
 	for move in comp_moves: #if this loop runs 0 times, no legal moves for computer (so loss)
 		newBoard = doTurn(circles, move)
 		human_moves = getLegalMoves(newBoard)
@@ -88,16 +98,16 @@ def performComputerTurnHelper(circles):
 				alwaysWins = False
 				break
 		if alwaysWins:
-			winForCurrPlayer.append(circles, True, move)
+			winForCurrPlayer[circle_indicator] = (True, move)
 			return True, move
-	winForCurrPlayer.append(circles, False, None)
+	winForCurrPlayer[circle_indicator] = (False, None)
 	return False, None
 
 def performComputerTurn(circles, winner_predict, win):
 	loading = Text(Point(NUM_COLS * SQUARE_WIDTH + 50, 140), "Thinking...")
 	loading.draw(win)
-	for legalMove in getLegalMoves(circles):
-		print(legalMove)
+	# for legalMove in getLegalMoves(circles):
+	# 	print(legalMove)
 	isWin, moves = performComputerTurnHelper(circles)
 	loading.undraw()
 	if isWin:
@@ -125,6 +135,7 @@ def playGame():
 	player_2_win_text = Text(Point(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 33), "Computer wins: 0")
 	player_2_win_text.draw(win)
 	while(True):
+		winForCurrPlayer.clear()
 		winner_predict.setText("Who will win?")
 		circles = createCircles(win)
 		player_1_turn = True
