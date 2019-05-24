@@ -251,7 +251,7 @@ def getLegalMoves(circles):
 				row_options.append(appending_array)
 		for entry in row_options:
 			output_array = [[0] * NUM_ROWS for i in range(NUM_COLS)]
-			for i in range(len(output_array[k])):
+			for i in range(len(output_array)):
 				output_array[i][k] = entry[i]
 			output.append(output_array)
 	# print(output)
