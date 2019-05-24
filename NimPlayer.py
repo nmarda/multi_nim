@@ -8,8 +8,8 @@ from random import *
 STONE_DIAMETER = 40
 STONE_COLOR = "blue"
 SQUARE_WIDTH = STONE_DIAMETER + 10
-NUM_ROWS = 4
-NUM_COLS = 2
+NUM_ROWS = 2
+NUM_COLS = 4
 SCREEN_WIDTH = NUM_COLS * SQUARE_WIDTH + 100
 SCREEN_HEIGHT = NUM_ROWS * SQUARE_WIDTH + 100
 COMPUTER_FIRST = False
@@ -63,8 +63,12 @@ def doTurn(circles, turn):
 				newBoard[column].remove(circle)
 	return newBoard
 
+winForCurrPlayer = {} # dict from board to (first player winning, winning move if True)
+
 def performComputerTurnHelper(circles):
 	comp_moves = getLegalMoves(circles)
+	if circles in winForCurrPlayer.keys():
+		return winForCurrPlayer[circles]
 	# print(circleCount(circles))
 	# print("Current Board:", circles)
 	# print("Possible moves:", comp_moves)
@@ -84,7 +88,9 @@ def performComputerTurnHelper(circles):
 				alwaysWins = False
 				break
 		if alwaysWins:
+			winForCurrPlayer.append(circles, True, move)
 			return True, move
+	winForCurrPlayer.append(circles, False, None)
 	return False, None
 
 def performComputerTurn(circles, winner_predict, win):
