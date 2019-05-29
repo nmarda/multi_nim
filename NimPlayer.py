@@ -8,11 +8,11 @@ from random import *
 STONE_DIAMETER = 40
 STONE_COLOR = "blue"
 SQUARE_WIDTH = STONE_DIAMETER + 10
-NUM_ROWS = 4
-NUM_COLS = 4
+NUM_ROWS = 2
+NUM_COLS = 2
 SCREEN_WIDTH = max(NUM_COLS * SQUARE_WIDTH + 100, 220)
 SCREEN_HEIGHT = max(NUM_ROWS * SQUARE_WIDTH + 100, 220)
-COMPUTER_FIRST = True
+COMPUTER_FIRST = False
 
 """
 graphics handling, etc
@@ -316,7 +316,7 @@ def performComputerTurnHelper3(circles):
 next Feature: have the computer play itself, one looks up to 10 moves forward then does some random analysis or something, the other looks like 11 or soemthing.
 """
 
-def performComputerTurn(circles, winner_predict, win):
+def performComputerTurnPerfect(circles, winner_predict, win):
 	start_time = time.time()
 	loading = Text(Point(NUM_COLS * SQUARE_WIDTH + 50, 140), "Thinking...")
 	loading.draw(win)
@@ -329,10 +329,25 @@ def performComputerTurn(circles, winner_predict, win):
 			print("--- %s seconds ---" % (time.time() - start_time))
 			return True, move
 	loading.undraw()
-	# if isWin:
-		# winner_predict.setText("Computer will win!")
-	# else:
 	winner_predict.setText("Player will win!")
+	print("--- %s seconds ---" % (time.time() - start_time))
+	# print(counter)
+	return False, None
+
+def performHumanTurnPerfect(circles, winner_predict, win):
+	start_time = time.time()
+	loading = Text(Point(NUM_COLS * SQUARE_WIDTH + 50, 140), "Thinking...")
+	loading.draw(win)
+	for move in getLegalMoves(circles):
+		newCircles = doTurn(circles, move)
+		isWin = not performComputerTurnHelper3(newCircles)
+		if isWin:
+			loading.undraw()
+			winner_predict.setText("Player will win!")
+			print("--- %s seconds ---" % (time.time() - start_time))
+			return True, move
+	loading.undraw()
+	winner_predict.setText("Computer will win!")
 	print("--- %s seconds ---" % (time.time() - start_time))
 	# print(counter)
 	return False, None
@@ -367,7 +382,7 @@ def playGame():
 		# winForCurrPlayer.clear()
 		winner_predict.setText("Who will win?")
 		circles = createCircles(win)
-		player_1_turn = True
+		player_turn = True
 		player_text.setText("Player's turn")
 		endTurn.setFill("red")
 		tiles_removed = 0
@@ -375,7 +390,7 @@ def playGame():
 		col_selection = -1
 		# makeSymmetry(getIndicatorArray(circles))
 		if COMPUTER_FIRST:
-			comp_win, moves = performComputerTurn(circles, winner_predict, win)
+			comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win)
 			if not comp_win:
 				moves = choice(getLegalMoves(circles))
 			for move in moves:
@@ -394,54 +409,65 @@ def playGame():
 				player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
 
 		while circles != [[] for i in range(NUM_COLS)]:
-			# print(circles)
-			getLegalMoves(circles)
-			click = win.getMouse()
-			if clickedBox(click):
-				if tiles_removed != 0:
-					tiles_removed = 0
-					player_1_turn = not player_1_turn
-					endTurn.setFill("red")
-					player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
-					row_selection = -1
-					col_selection = -1
-					# makeSymmetry(getIndicatorArray(circles))
-					comp_win, moves = performComputerTurn(circles, winner_predict, win)
-					if not comp_win:
-						moves = choice(getLegalMoves(circles))
-					for move in moves:
-						row, col = circToArrayIndex(move)
-						circles[col].remove(move)
-						move.undraw()
-
-					if circles != [[] for _ in range(NUM_COLS)]:
-						player_1_turn = True
-						player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
-			elif clickedExit(click):
-				return
+			if player_turn:
+				is_win, moves = performHumanTurnPerfect(circles, winner_predict, win)
 			else:
-				# print(len(circles))
-				for column in range(len(circles)):
-					for circ in circles[column]:
-						if clickedCircle(circ, click):
-							row, col = circ.getCenter().getY(), circ.getCenter().getX()
-							if row_selection == -1 and col_selection == -1:
-								row_selection, col_selection = row, col
-							elif row_selection == row:
-								col_selection = -1
-							elif col_selection == col:
-								row_selection = -1
-							else:
-								circ.setFill("black")
-								time.sleep(1)
-								circ.setFill(STONE_COLOR)
-								break
-							tiles_removed += 1
-							endTurn.setFill("green")
-							circles[column].remove(circ)
-							circ.undraw()
-							break
-		if player_1_turn:
+				is_win, moves = performComputerTurnPerfect(circles, winner_predict, win)
+			if not is_win:
+				moves = choice(getLegalMoves(circles))
+			for move in moves:
+				row, col = circToArrayIndex(move)
+				circles[col].remove(move)
+				move.undraw()
+			player_turn = not player_turn
+			# # print(circles)
+			# getLegalMoves(circles)
+			# click = win.getMouse()
+			# if clickedBox(click):
+			# 	if tiles_removed != 0:
+			# 		tiles_removed = 0
+			# 		player_1_turn = not player_1_turn
+			# 		endTurn.setFill("red")
+			# 		player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
+			# 		row_selection = -1
+			# 		col_selection = -1
+			# 		# makeSymmetry(getIndicatorArray(circles))
+			# 		comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win)
+			# 		if not comp_win:
+			# 			moves = choice(getLegalMoves(circles))
+			# 		for move in moves:
+			# 			row, col = circToArrayIndex(move)
+			# 			circles[col].remove(move)
+			# 			move.undraw()
+
+			# 		if circles != [[] for _ in range(NUM_COLS)]:
+			# 			player_1_turn = True
+			# 			player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
+			# elif clickedExit(click):
+			# 	return
+			# else:
+			# 	# print(len(circles))
+			# 	for column in range(len(circles)):
+			# 		for circ in circles[column]:
+			# 			if clickedCircle(circ, click):
+			# 				row, col = circ.getCenter().getY(), circ.getCenter().getX()
+			# 				if row_selection == -1 and col_selection == -1:
+			# 					row_selection, col_selection = row, col
+			# 				elif row_selection == row:
+			# 					col_selection = -1
+			# 				elif col_selection == col:
+			# 					row_selection = -1
+			# 				else:
+			# 					circ.setFill("black")
+			# 					time.sleep(1)
+			# 					circ.setFill(STONE_COLOR)
+			# 					break
+			# 				tiles_removed += 1
+			# 				endTurn.setFill("green")
+			# 				circles[column].remove(circ)
+			# 				circ.undraw()
+			# 				break
+		if not player_turn: #actually means the player just moved, i.e. won
 			player_1_wins += 1
 			player_1_win_text.setText("Player wins: " + str(player_1_wins))
 		else:
