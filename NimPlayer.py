@@ -8,9 +8,9 @@ from random import *
 STONE_DIAMETER = 40
 STONE_COLOR = "blue"
 SQUARE_WIDTH = STONE_DIAMETER + 10
-NUM_ROWS = 4
+NUM_ROWS = 7
 NUM_COLS = 4
-SCREEN_WIDTH = NUM_COLS * SQUARE_WIDTH + 100
+SCREEN_WIDTH = max(NUM_COLS * SQUARE_WIDTH + 100, 220)
 SCREEN_HEIGHT = max(NUM_ROWS * SQUARE_WIDTH + 100, 220)
 COMPUTER_FIRST = True
 
@@ -88,6 +88,22 @@ def biggestCol(indicator):
 # 	rows = 
 # 	for i in range(indicator.shape[0]):
 
+def orderRowsAndCols(indicator):
+	bot_row = 0
+	while bot_row < indicator.shape[1]:
+		big_row_ind = bot_row + biggestRow(indicator[:, bot_row:])
+		temp = np.copy(indicator[:, big_row_ind])
+		indicator[:, big_row_ind] = indicator[:, bot_row]
+		indicator[:, bot_row] = temp
+		bot_row += 1
+	left_col = 0
+	while left_col < indicator.shape[0]:
+		big_col_ind = left_col + biggestCol(indicator[left_col:])
+		temp = np.copy(indicator[big_col_ind])
+		indicator[big_col_ind] = indicator[left_col]
+		indicator[left_col] = temp
+		left_col += 1
+	return indicator
 
 def makeSymmetry(indicator):
 	"""
@@ -96,6 +112,7 @@ def makeSymmetry(indicator):
 	# nicePrint(indicator)
 	indicator = getIndicatorArray(indicator)
 	indicator = np.array(indicator)
+	indicator = orderRowsAndCols(indicator)
 	# print(indicator.sum())
 	if indicator.sum() == 0: return
 	bot_row = 0
@@ -129,7 +146,7 @@ def makeSymmetry(indicator):
 		# print("indicator after row gravity:", indicator)
 		# for i in range(indicator_len):
 		# 	print(indicator[i][bot_row])
-		arr = [i for i in range(indicator_len) if indicator[i][bot_row] == 1]
+		arr = [i for i in range(indicator.shape[0]) if indicator[i][bot_row] == 1]
 		if arr == []: break
 		right_col = max(arr)
 		# print("right_col", right_col)
@@ -155,30 +172,63 @@ def makeSymmetry(indicator):
 			# 	break
 		left_col += 1
 		bot_row = threshold
+	if NUM_ROWS == NUM_COLS:
+		trans = stringifyIndicator(indicator.T.tolist())
+		if trans in winForCurrPlayer.keys():
+			return trans
+	# if random() < .0001:
+	# 	print(indicator)
 	return stringifyIndicator(indicator.tolist())
 
 
 
-
-	# nicePrint(indicator)
+# def makeSymmetry(indicator):
+	# """
+	# takes in indicator array, returns string
+	# """
+	# # nicePrint(indicator)
+	# indicator = getIndicatorArray(indicator)
+	# indicator = np.array(indicator)
+	# # print(indicator.sum())
+	# if indicator.sum() == 0: return
 	# bot_row = 0
 	# left_col = 0
-	# while bot_row < len(indicator):
-	# 	print(bot_row)
-	# 	print("indicator in makeSym:", indicator[:])
-	# 	print("indicator in makeSym from 1 up:", indicator[:][1:])
-	# 	print("indicator in makeSym from bot_row up:", getRows(indicator, bot_row))
-	# 	big_row_ind = bot_row + biggestRow(getRows(indicator, bot_row))
+	# indicator_len = indicator.shape[1]
+	# while bot_row < indicator_len:
+	# 	# print("bot_row", bot_row)
+	# 	# print("indicator before row swap:", indicator)
+	# 	# print("indicator in makeSym from 1 up:", indicator[:][1:])
+	# 	# print("indicator in makeSym from bot_row up:", indicator[:, bot_row:])
+	# 	big_row_ind = bot_row + biggestRow(indicator[:, bot_row:])
 	# 	# print(indicator[:][big_row_ind])
-	# 	temp = indicator[:][big_row_ind]
-	# 	indicator[:][big_row_ind] = indicator[:][bot_row]
-	# 	indicator[:][bot_row] = temp
+	# 	temp = np.copy(indicator[:, big_row_ind])
+	# 	# temp = indicator[:][big_row_ind]
+	# 	indicator[:, big_row_ind] = indicator[:, bot_row]
+	# 	indicator[:, bot_row] = temp
 	# 	threshold = bot_row + 1
-	# 	right_col = max([i for i in range(len(indicator)) if indicator[i][bot_row] == 1])
-	# 	# unsorted = [i for i in range(left_col, len(indicator)) if indicator[i][bot_row] == 1]
-	# 	while left_col < right_col and indicator[left_col][bot_row] == 1:
-	# 		big_col_ind = left_col + biggestCol(getRows(indicator[left_col:right_col + 1], threshold)) #biggestCol(indicator[left_col:right_col + 1][threshold:])
-	# 		temp = indicator[left_col]
+	# 	# print("temp:", temp)
+	# 	# print("indicator after row swap:", indicator)
+	# 	#gravity that boi
+	# 	bottom_row_has_one = [i for i in range(left_col, NUM_COLS) if indicator[i, bot_row] == 1]
+	# 	curr_col = left_col
+	# 	while curr_col < NUM_COLS - 1 and bottom_row_has_one != []:
+	# 		if indicator[curr_col, bot_row] != 1:
+	# 			temp = np.copy(indicator[curr_col])
+	# 			indicator[curr_col] = indicator[bottom_row_has_one[0]]
+	# 			indicator[bottom_row_has_one[0]] = temp
+	# 			# print("in between:", indicator, curr_col, left_col, bottom_row_has_one)
+	# 		bottom_row_has_one.pop(0)
+	# 		curr_col += 1
+	# 	# print("indicator after row gravity:", indicator)
+	# 	# for i in range(indicator_len):
+	# 	# 	print(indicator[i][bot_row])
+	# 	arr = [i for i in range(indicator_len) if indicator[i][bot_row] == 1]
+	# 	if arr == []: break
+	# 	right_col = max(arr)
+	# 	# print("right_col", right_col)
+	# 	while left_col < right_col:# and indicator[left_col][bot_row] == 1:
+	# 		big_col_ind = left_col + biggestCol(indicator[left_col:right_col + 1, bot_row:]) #biggestCol(indicator[left_col:right_col + 1][threshold:])
+	# 		temp = np.copy(indicator[left_col])
 	# 		indicator[left_col] = indicator[big_col_ind]
 	# 		indicator[big_col_ind] = temp
 	# 		#gravity that boi
@@ -186,18 +236,25 @@ def makeSymmetry(indicator):
 	# 		curr_row = threshold
 	# 		while curr_row < NUM_ROWS - 1 and left_col_has_one != []:
 	# 			if indicator[left_col][curr_row] != 1:
-	# 				temp = indicator[:][curr_row]
-	# 				indicator[:][curr_row] = getRow(indicator, left_col_has_one[0]) #indicator[:][left_col_has_one[0]]
-	# 				indicator[:][left_col_has_one[0]] = temp
-	# 				left_col_has_one.pop(0)
-	# 			threshold += 1
+	# 				temp = np.copy(indicator[:, curr_row])
+	# 				indicator[:, curr_row] = indicator[:, left_col_has_one[0]] #indicator[:][left_col_has_one[0]]
+	# 				indicator[:, left_col_has_one[0]] = temp
+	# 			left_col_has_one.pop(0)
 	# 			curr_row += 1
+	# 		threshold += 1
 	# 		left_col += 1
-	# 		if threshold >= right_col:
-	# 			left_col = right_col + 1
-	# 			break
+	# 		# if threshold >= right_col:
+	# 		# 	left_col = right_col + 1
+	# 		# 	break
+	# 	left_col += 1
 	# 	bot_row = threshold
-	# nicePrint(indicator)
+	# if NUM_ROWS == NUM_COLS:
+	# 	trans = stringifyIndicator(indicator.T.tolist())
+	# 	if trans in winForCurrPlayer.keys():
+	# 		return trans
+	# if random() < .0001:
+	# 	print(indicator)
+	# return stringifyIndicator(indicator.tolist())
 
 
 def nicePrint(arr):
@@ -227,7 +284,8 @@ def doTurn(circles, turn):
 winForCurrPlayer = {} # dict from board to (first player winning, winning move if True)
 
 def stringifyIndicator(indicator):
-	ans = str(NUM_ROWS)
+	# ans = str(NUM_ROWS)
+	ans = ""
 	for col in indicator:
 		for circ in col:
 			ans += str(circ)
@@ -235,7 +293,8 @@ def stringifyIndicator(indicator):
 
 
 def stringify(circles):
-	ans = str(NUM_ROWS)
+	# ans = str(NUM_ROWS)
+	ans = ""
 	for col in getIndicatorArray(circles):
 		for circ in col:
 			ans += str(circ)
