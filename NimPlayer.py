@@ -13,7 +13,8 @@ NUM_COLS = int(sys.argv[-2])
 SCREEN_WIDTH = max(NUM_COLS * SQUARE_WIDTH + 100, 220)
 SCREEN_HEIGHT = max(NUM_ROWS * SQUARE_WIDTH + 167, 220)
 COMPUTER_FIRST = sys.argv[1][0] in ['T', 't']
-GRAPHICS = sys.argv[2][0] in ['T', 't']
+PLAY_YOURSELF = sys.argv[4][0] in ['T', 't']
+GRAPHICS = sys.argv[2][0] in ['T', 't'] or PLAY_YOURSELF
 CLEAR_MEMO_EVERY_GAME = sys.argv[3][0] in ['T', 't']
 Total_time = 0
 
@@ -85,12 +86,6 @@ def biggestCol(indicator):
 	ans = [i for i in range(indicator.shape[0]) if col_lengths[i]==max_col][0]
 	# print("biggestCol:", ans)
 	return ans
-
-# def makeSymmetry2(indicator):
-# 	indicator = np.array(indicator)
-# 	possibilities = []
-# 	rows = 
-# 	for i in range(indicator.shape[0]):
 
 def orderRowsAndCols(indicator):
 	bot_row = 0
@@ -359,84 +354,77 @@ def playGame():
 				circles[col].remove(move)
 				if GRAPHICS:
 					move.undraw()
-			# else:
-			# 	random_col = -1
-			# 	while random_col == -1 or circles[random_col] == []:
-			# 		random_col = randint(0, NUM_COLS - 1)
-			# 	toRemove = choice(circles[random_col])
-			# 	circles[random_col].remove(toRemove)
-			# 	toRemove.undraw()
 			if circles != [[] for _ in range(NUM_COLS)]:
 				player_turn = True 
 				player_text.setText("Player's turn" if player_turn else "Computer's turn")
 
 		while circles != [[] for i in range(NUM_COLS)]:
+			if not PLAY_YOURSELF:
+				# if player_turn:
+				is_win, moves = performComputerTurnPerfect(circles, winner_predict, win, not player_turn)
+				# else:
+				# 	is_win, moves = performComputerTurnPerfect(circles, winner_predict, win)
+				if not is_win:
+					moves = choice(getLegalMoves(circles))
+				for move in moves:
+					row, col = circToArrayIndex(move)
+					circles[col].remove(move)
+					if GRAPHICS:
+						move.undraw()
+				player_turn = not player_turn
 
-			# if player_turn:
-			is_win, moves = performComputerTurnPerfect(circles, winner_predict, win, not player_turn)
-			# else:
-			# 	is_win, moves = performComputerTurnPerfect(circles, winner_predict, win)
-			if not is_win:
-				moves = choice(getLegalMoves(circles))
-			for move in moves:
-				row, col = circToArrayIndex(move)
-				circles[col].remove(move)
-				if GRAPHICS:
-					move.undraw()
-			player_turn = not player_turn
 
+				# # print(circles)
+				# getLegalMoves(circles)
 
-			# # print(circles)
-			# getLegalMoves(circles)
+		# This section is used if you want to play yourself
+			else:
+				click = win.getMouse()
+				if clickedBox(click):
+					if tiles_removed != 0:
+						tiles_removed = 0
+						player_turn = not player_turn
+						endTurn.setFill("red")
+						player_text.setText("Player's turn" if player_turn else "Computer's turn")
+						row_selection = -1
+						col_selection = -1
+						# makeSymmetry(getIndicatorArray(circles))
+						comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win, True)
+						if not comp_win:
+							moves = choice(getLegalMoves(circles))
+						for move in moves:
+							row, col = circToArrayIndex(move)
+							circles[col].remove(move)
+							move.undraw()
 
-		#From here to end of commented section is used if you want to play yourself
+						if circles != [[] for _ in range(NUM_COLS)]:
+							player_turn = True
+							player_text.setText("Player's turn" if player_turn else "Computer's turn")
+				elif clickedExit(click):
+					return
+				else:
+					# print(len(circles))
+					for column in range(len(circles)):
+						for circ in circles[column]:
+							if clickedCircle(circ, click):
+								row, col = circ.getCenter().getY(), circ.getCenter().getX()
+								if row_selection == -1 and col_selection == -1:
+									row_selection, col_selection = row, col
+								elif row_selection == row:
+									col_selection = -1
+								elif col_selection == col:
+									row_selection = -1
+								else:
+									circ.setFill("red")
+									time.sleep(1)
+									circ.setFill(STONE_COLOR)
+									break
+								tiles_removed += 1
+								endTurn.setFill("green")
+								circles[column].remove(circ)
+								circ.undraw()
+								break
 
-		# 	click = win.getMouse()
-		# 	if clickedBox(click):
-		# 		if tiles_removed != 0:
-		# 			tiles_removed = 0
-		# 			player_turn = not player_turn
-		# 			endTurn.setFill("red")
-		# 			player_text.setText("Player's turn" if player_turn else "Computer's turn")
-		# 			row_selection = -1
-		# 			col_selection = -1
-		# 			# makeSymmetry(getIndicatorArray(circles))
-		# 			comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win, True)
-		# 			if not comp_win:
-		# 				moves = choice(getLegalMoves(circles))
-		# 			for move in moves:
-		# 				row, col = circToArrayIndex(move)
-		# 				circles[col].remove(move)
-		# 				move.undraw()
-
-		# 			if circles != [[] for _ in range(NUM_COLS)]:
-		# 				player_turn = True
-		# 				player_text.setText("Player's turn" if player_turn else "Computer's turn")
-		# 	elif clickedExit(click):
-		# 		return
-		# 	else:
-		# 		# print(len(circles))
-		# 		for column in range(len(circles)):
-		# 			for circ in circles[column]:
-		# 				if clickedCircle(circ, click):
-		# 					row, col = circ.getCenter().getY(), circ.getCenter().getX()
-		# 					if row_selection == -1 and col_selection == -1:
-		# 						row_selection, col_selection = row, col
-		# 					elif row_selection == row:
-		# 						col_selection = -1
-		# 					elif col_selection == col:
-		# 						row_selection = -1
-		# 					else:
-		# 						circ.setFill("red")
-		# 						time.sleep(1)
-		# 						circ.setFill(STONE_COLOR)
-		# 						break
-		# 					tiles_removed += 1
-		# 					endTurn.setFill("green")
-		# 					circles[column].remove(circ)
-		# 					circ.undraw()
-		# 					break
-		
 		if not player_turn: #actually means the player just moved, i.e. won
 			player_1_wins += 1
 			player_1_win_text.setText("Player wins: " + str(player_1_wins))
