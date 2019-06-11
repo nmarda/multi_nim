@@ -5,18 +5,27 @@ import numpy as np
 import itertools
 from random import *
 
+#recommended running:   python3 NimPlayer.py t f t f 4 4
+#						python3 NimPlayer.py t t t t 8 8 (try and beat it!)
+
+COMPUTER_FIRST = sys.argv[1][0] in ['T', 't']
+PLAY_YOURSELF = sys.argv[2][0] in ['T', 't']
+GRAPHICS = sys.argv[3][0] in ['T', 't'] or PLAY_YOURSELF
+CLEAR_MEMO_EVERY_GAME = sys.argv[4][0] in ['T', 't']
+NUM_ROWS = int(sys.argv[-1])
+NUM_COLS = int(sys.argv[-2])
+
 STONE_DIAMETER = 40
 STONE_COLOR = "blue"
 SQUARE_WIDTH = STONE_DIAMETER + 10
-NUM_ROWS = int(sys.argv[-1])
-NUM_COLS = int(sys.argv[-2])
 SCREEN_WIDTH = max(NUM_COLS * SQUARE_WIDTH + 100, 220)
 SCREEN_HEIGHT = max(NUM_ROWS * SQUARE_WIDTH + 167, 220)
-COMPUTER_FIRST = sys.argv[1][0] in ['T', 't']
-PLAY_YOURSELF = sys.argv[4][0] in ['T', 't']
-GRAPHICS = sys.argv[2][0] in ['T', 't'] or PLAY_YOURSELF
-CLEAR_MEMO_EVERY_GAME = sys.argv[3][0] in ['T', 't']
 Total_time = 0
+player_moves = []
+computer_moves = []
+useBeta = False
+useRandSpeedUP = True
+
 
 """
 graphics handling, etc
@@ -104,14 +113,14 @@ def orderRowsAndCols(indicator):
 		left_col += 1
 	return indicator
 
-def isCircSym(circle_indicator):
-	indicator = np.array(circle_indicator)
-	ans = np.array_equal(indicator, np.rot90(indicator, 2))
-	# if ans:
-	# 	print("ans")
-	return ans
+# def isCircSym(circle_indicator):
+# 	indicator = np.array(circle_indicator)
+# 	ans = np.array_equal(indicator, np.rot90(indicator, 2))
+# 	# if ans:
+# 	# 	print("ans")
+# 	return ans
 
-def makeSymmetry(indicator):
+def makeSymmetry(indicator, isBeta):
 	"""
 	takes in indicator array, returns string
 	"""
@@ -180,7 +189,7 @@ def makeSymmetry(indicator):
 		bot_row = threshold
 	if NUM_ROWS == NUM_COLS:
 		trans = stringifyIndicator(indicator.T.tolist())
-		if trans in winForCurrPlayer.keys():
+		if isBeta and trans in winForCurrPlayerBeta.keys() or not isBeta and trans in winForCurrPlayer.keys():
 			return trans
 	# if random() < .0001:
 	# 	print(indicator)
@@ -210,7 +219,8 @@ def doTurn(circles, turn):
 				newBoard[column].remove(circle)
 	return newBoard
 
-winForCurrPlayer = {} # dict from board to (first player winning, winning move if True)
+winForCurrPlayer = {} # dict from board to (win_for_first_player, moves)
+winForCurrPlayerBeta = {} # dict from board to (is_sure, (num_wins, num_losses))
 
 def stringifyIndicator(indicator):
 	# ans = str(NUM_ROWS)
@@ -231,8 +241,10 @@ def stringify(circles):
 
 counter = 0
 
-def performComputerTurnHelper(circles):
-	circle_indicator = makeSymmetry(circles)
+def performComputerTurnPerfectHelper(circles):
+	global counter
+	counter += 1
+	circle_indicator = makeSymmetry(circles, False)
 	# if isCircSym(getIndicatorArray(circles)):
 	# 	return False
 	if circle_indicator in winForCurrPlayer.keys():
@@ -240,17 +252,14 @@ def performComputerTurnHelper(circles):
 	legal_moves = getLegalMoves(circles)
 	for move in legal_moves:
 		newBoard = doTurn(circles, move)
-		if not performComputerTurnHelper(newBoard):
+		if not performComputerTurnPerfectHelper(newBoard):
 			winForCurrPlayer[circle_indicator] = True
 			return True
 	winForCurrPlayer[circle_indicator] = False
 	return False
 
-"""
-next Feature: have the computer play itself, one looks up to 10 moves forward then does some random analysis or something, the other looks like 11 or soemthing.
-"""
-
 def performComputerTurnPerfect(circles, winner_predict, win, compTurn):
+	
 	global Total_time
 	# time.sleep(1)
 	# return True, choice(getLegalMoves(circles))
@@ -260,7 +269,7 @@ def performComputerTurnPerfect(circles, winner_predict, win, compTurn):
 		loading.draw(win)
 	for move in getLegalMoves(circles):
 		newCircles = doTurn(circles, move)
-		isWin = not performComputerTurnHelper(newCircles)
+		isWin = not performComputerTurnPerfectHelper(newCircles)
 		if isWin:
 			if GRAPHICS:
 				loading.undraw()
@@ -274,6 +283,79 @@ def performComputerTurnPerfect(circles, winner_predict, win, compTurn):
 	Total_time += time.time() - start_time
 	# print(counter)
 	return False, None
+
+def performComputerTurnBetaHelper(circles, num_moves):
+	# global counting
+	# counting += 1
+	circle_indicator = makeSymmetry(circles, True)
+	if circle_indicator in winForCurrPlayerBeta.keys() and winForCurrPlayerBeta[circle_indicator][0]:
+		return winForCurrPlayerBeta[circle_indicator][1][1] == 0 #means no false values
+	if num_moves == 0:
+		print("error1")
+		if circle_indicator in winForCurrPlayerBeta.keys():
+			_, (win, loss) = winForCurrPlayerBeta[circle_indicator] #isSure is necessarily false here.
+			ans = beta.pdf(win, loss)
+		else:
+			ans = beta.pdf(1, 1)
+		return ans
+	legal_moves = getLegalMoves(circles)
+	max_win_prob = 0
+	for move in legal_moves:
+		newBoard = doTurn(circles, move)
+		move_win_prob = 1 - performComputerTurnBetaHelper(newBoard, num_moves - 1)
+		if move_win_prob > max_win_prob:
+			if move_win_prob == 1:
+				winForCurrPlayerBeta[circle_indicator] = True, (1, 0)
+				return 1
+			else:
+				print("error3")
+				max_win_prob = move_win_prob
+	if max_win_prob == 0:
+		winForCurrPlayerBeta[circle_indicator] = True, (0, 1)
+	else:
+		print("error4")
+	return max_win_prob
+
+def performComputerTurnBeta(circles, winner_predict, win, compTurn):
+	global Total_time
+	
+	# time.sleep(1) 
+	# return True, choice(getLegalMoves(circles))
+	start_time = time.time()
+	# loading = Text(Point(NUM_COLS * SQUARE_WIDTH + 50, 140), "Thinking...")
+	# loading.draw(win)
+	max_win_prob = 0
+	max_win_move = None
+	max_new_circles = None
+	legalMoves = getLegalMoves(circles)
+	tempCount = 0
+	for move in legalMoves:
+		newCircles = doTurn(circles, move)
+		winProb = 1 - performComputerTurnBetaHelper(newCircles, 3)
+		if winProb == 1:
+			# loading.undraw()
+			winner_predict.setText("Computer will win!" if compTurn else "Player will win!")
+			Total_time += time.time() - start_time
+			# print("--- %s seconds ---" % (time.time() - start_time))
+			# winForCurrPlayerBeta[stringifyIndicator(getIndicatorArray(circles))] = True, (1, 0)
+			return 1, move
+		if winProb != 0:
+			print("Error2")
+		if max_win_prob < winProb:
+			max_win_prob = winProb
+			max_win_move = move
+			max_new_circles = newCircles
+	# loading.undraw()
+	if max_win_prob == 0:
+		winner_predict.setText("Player will win!" if compTurn else "Computer will win!")
+	elif max_win_move != None:
+		if compTurn:
+			computer_moves.append(max_new_circles)
+		else:
+			player_moves.append(max_new_circles)
+	Total_time += time.time() - start_time
+	# print(counter)
+	return max_win_prob, max_win_move
 
 def performHumanTurnPerfect(circles, winner_predict, win):
 	global Total_time
@@ -295,8 +377,13 @@ def performHumanTurnPerfect(circles, winner_predict, win):
 	# print(counter)
 	return False, None
 
-# def performImperfectBetaTurn(circles):
-
+def addResults(boards, isWin):
+	for board in boards:
+		temp = winForCurrPlayerBeta.get(board, (False, (1, 1)))
+		# print(temp)
+		temp[1][isWin] += 1
+		winForCurrPlayerBeta[board] = temp
+		# print(winForCurrPlayerBeta[board])
 
 """
 general gameplay
@@ -331,10 +418,12 @@ def playGame():
 	total_runs = 0
 	while(True):		
 		FIRST_MOVE = True
+		print(counter)
 		if CLEAR_MEMO_EVERY_GAME:
 			winForCurrPlayer.clear()
+			winForCurrPlayerBeta.clear()
 		if total_runs > 0:
-			average_time_text.setText("Average Time: " + str(Total_time / total_runs))
+			average_time_text.setText("Average Time: {0:.3f}".format((Total_time / total_runs)))
 		total_runs += 1
 		# winner_predict.setText("Who will win?")
 		circles = createCircles(win)
@@ -345,27 +434,30 @@ def playGame():
 		row_selection = -1
 		col_selection = -1
 		# makeSymmetry(getIndicatorArray(circles))
-		if COMPUTER_FIRST:
-			comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win, True)
-			if not comp_win:
-				moves = choice(getLegalMoves(circles))
-			for move in moves:
-				row, col = circToArrayIndex(move)
-				circles[col].remove(move)
-				if GRAPHICS:
-					move.undraw()
-			if circles != [[] for _ in range(NUM_COLS)]:
-				player_turn = True 
-				player_text.setText("Player's turn" if player_turn else "Computer's turn")
+		# if COMPUTER_FIRST:
+		# 	comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win, True)
+		# 	if not comp_win:
+		# 		moves = choice(getLegalMoves(circles))
+		# 	for move in moves:
+		# 		row, col = circToArrayIndex(move)
+		# 		circles[col].remove(move)
+		# 		if GRAPHICS:
+		# 			move.undraw()
+		# 	if circles != [[] for _ in range(NUM_COLS)]:
+		# 		player_turn = True 
+		# 		player_text.setText("Player's turn" if player_turn else "Computer's turn")
 
 		while circles != [[] for i in range(NUM_COLS)]:
 			if not PLAY_YOURSELF:
-				# if player_turn:
-				is_win, moves = performComputerTurnPerfect(circles, winner_predict, win, not player_turn)
-				# else:
-				# 	is_win, moves = performComputerTurnPerfect(circles, winner_predict, win)
-				if not is_win:
-					moves = choice(getLegalMoves(circles))
+				if useRandSpeedUp and circleCount(circles) > 16: #NUM_COLS * NUM_ROWS / 5:
+					moves = getRandomMove(circles)
+				else:
+					if player_turn and useBeta:
+						is_win, moves = performComputerTurnBeta(circles, winner_predict, win, not player_turn)
+					else:
+						is_win, moves = performComputerTurnPerfect(circles, winner_predict, win, not player_turn)
+					if moves is None:
+						moves = choice(getLegalMoves(circles))
 				for move in moves:
 					row, col = circToArrayIndex(move)
 					circles[col].remove(move)
@@ -379,6 +471,23 @@ def playGame():
 
 		# This section is used if you want to play yourself
 			else:
+				if COMPUTER_FIRST and FIRST_MOVE:
+					if useRandSpeedUP and circleCount(circles) > 16:# NUM_COLS * NUM_ROWS / 5:
+						moves = getRandomMove(circles)
+					else:
+						comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win, True)
+						if not comp_win:
+							moves = choice(getLegalMoves(circles))
+					for move in moves:
+						row, col = circToArrayIndex(move)
+						circles[col].remove(move)
+						if GRAPHICS:
+							move.undraw()
+					if circles != [[] for _ in range(NUM_COLS)]:
+						player_turn = True 
+						player_text.setText("Player's turn" if player_turn else "Computer's turn")
+						FIRST_MOVE = False
+
 				click = win.getMouse()
 				if clickedBox(click):
 					if tiles_removed != 0:
@@ -389,9 +498,12 @@ def playGame():
 						row_selection = -1
 						col_selection = -1
 						# makeSymmetry(getIndicatorArray(circles))
-						comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win, True)
-						if not comp_win:
-							moves = choice(getLegalMoves(circles))
+						if useRandSpeedUP and circleCount(circles) > 16: #NUM_COLS * NUM_ROWS / 5:
+							moves = getRandomMove(circles)
+						else:
+							comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win, True)
+							if not comp_win:
+								moves = choice(getLegalMoves(circles))
 						for move in moves:
 							row, col = circToArrayIndex(move)
 							circles[col].remove(move)
@@ -428,9 +540,14 @@ def playGame():
 		if not player_turn: #actually means the player just moved, i.e. won
 			player_1_wins += 1
 			player_1_win_text.setText("Player wins: " + str(player_1_wins))
+			addResults(player_moves, 1)
+			addResults(computer_moves, 0)
 		else:
 			player_2_wins += 1
 			player_2_win_text.setText("Computer wins: " + str(player_2_wins))
+			addResults(player_moves, 0)
+			addResults(computer_moves, 1)
+		FIRST_MOVE = True
 	win.getMouse()
 	win.close()
 
@@ -446,7 +563,6 @@ def circToArrayIndex(circle):
 def arrayIndexToCirc(row, col, circles):
 	for entry in circles[col]:
 		row_i, col_i = circToArrayIndex(entry)
-		# print(row_i, col_i)
 		if row_i == row:
 			return entry
 	return None
@@ -458,6 +574,8 @@ def getIndicatorArray(circles):
 			row, col = circToArrayIndex(entry)
 			array[col][row] = 1
 	return(array)	
+
+moveStorage = {}
 
 def getLegalMoves(circles):
 	array = getIndicatorArray(circles)
@@ -508,6 +626,7 @@ def getLegalMoves(circles):
 		if entry not in output_pruned:
 			output_pruned.append(entry)
 	# print(output_pruned)
+	# moveStorage[stringifyIndicator(array)] = output_pruned
 	output_final = []
 	for entry in output_pruned:
 		append_array = []
@@ -518,11 +637,38 @@ def getLegalMoves(circles):
 		output_final.append(append_array)
 	if [] in output_final:
 		output_final.remove([])
-	# for move in output_final:
-	# 	print(move)
-	# time.sleep(1)
+	# print(output_final)
 	return output_final
 
+def getCircles(indicator, circles):
+	if np.sum(indicator) == 0:
+		# print("yep")
+		return []
+	return [arrayIndexToCirc(col, row, circles) for row in range(len(indicator)) for col in range(len(indicator[0])) if indicator[row][col] == 1]
+
+def getRandomMove(circles):
+	indicator = np.array(getIndicatorArray(circles))
+	# print(indicator)
+	if random() < .5:
+		col = -1
+		while col == -1 or sum(indicator[col]) == 0:
+			col = int(floor(random() * len(indicator)))
+		pick = []
+		while pick == []:
+			pick = [i for i in range(indicator.shape[1]) if indicator[col, i] == 1 and random() < 0.5]
+		# print(pick)
+		ret = [arrayIndexToCirc(i, col, circles) for i in pick]
+	else:
+		row = -1
+		while row == -1 or sum(indicator[:, row]) == 0:
+			row = int(floor(random() * len(indicator[0])))
+		pick = []
+		while pick == []:
+			pick = [i for i in range(indicator.shape[0]) if indicator[i, row] == 1 and random() < 0.5]
+		# print(pick)
+		ret = [arrayIndexToCirc(row, i, circles) for i in pick]
+	# print(ret)
+	return ret
 
 if __name__ == "__main__":
 	playGame()

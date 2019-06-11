@@ -3,21 +3,26 @@ from math import *
 import time
 import numpy as np
 import itertools
-from scipy.stats import beta
+# from scipy.stats import beta
 from random import *
 
 STONE_DIAMETER = 40
 STONE_COLOR = "blue"
 SQUARE_WIDTH = STONE_DIAMETER + 10
 NUM_ROWS = 5
-NUM_COLS = 4
+NUM_COLS = 5
 SCREEN_WIDTH = max(NUM_COLS * SQUARE_WIDTH + 100, 220)
 SCREEN_HEIGHT = max(NUM_ROWS * SQUARE_WIDTH + 130, 220)
 COMPUTER_FIRST = False
-GRAPHICS = False
+GRAPHICS = True
 Total_time = 0
+Total_getMove_time = 0
 player_moves = []
 computer_moves = []
+MOVES_TO_CHECK = 15
+MAX_DEPTH = 2
+threshold = .8
+useRandSpeedUP = False
 
 """
 graphics handling, etc
@@ -129,7 +134,7 @@ def orderRowsAndCols(indicator):
 # 	# 	print("ans")
 # 	return ans
 
-def makeSymmetry(indicator):
+def makeSymmetryBeta(indicator):
 	"""
 	takes in indicator array, returns string
 	"""
@@ -141,73 +146,67 @@ def makeSymmetry(indicator):
 	if indicator.sum() == 0: return
 	bot_row = 0
 	left_col = 0
-	if len(indicator.shape) == 2:
-		indicator_len = indicator.shape[1]
-		indicator_wid = indicator.shape[0]
-		while bot_row < indicator_len:
-			# print("bot_row", bot_row)
-			# print("indicator before row swap:", indicator)
-			# print("indicator in makeSym from 1 up:", indicator[:][1:])
-			# print("indicator in makeSym from bot_row up:", indicator[:, bot_row:])
-			big_row_ind = bot_row + biggestRow(indicator[:, bot_row:])
-			# print(indicator[:][big_row_ind])
-			temp = np.copy(indicator[:, big_row_ind])
-			# temp = indicator[:][big_row_ind]
-			indicator[:, big_row_ind] = indicator[:, bot_row]
-			indicator[:, bot_row] = temp
-			threshold = bot_row + 1
-			# print("temp:", temp)
-			# print("indicator after row swap:", indicator)
+	indicator_len = indicator.shape[1]
+	while bot_row < indicator_len:
+		# print("bot_row", bot_row)
+		# print("indicator before row swap:", indicator)
+		# print("indicator in makeSym from 1 up:", indicator[:][1:])
+		# print("indicator in makeSym from bot_row up:", indicator[:, bot_row:])
+		big_row_ind = bot_row + biggestRow(indicator[:, bot_row:])
+		# print(indicator[:][big_row_ind])
+		temp = np.copy(indicator[:, big_row_ind])
+		# temp = indicator[:][big_row_ind]
+		indicator[:, big_row_ind] = indicator[:, bot_row]
+		indicator[:, bot_row] = temp
+		threshold = bot_row + 1
+		# print("temp:", temp)
+		# print("indicator after row swap:", indicator)
+		#gravity that boi
+		bottom_row_has_one = [i for i in range(left_col, NUM_COLS) if indicator[i, bot_row] == 1]
+		curr_col = left_col
+		while curr_col < NUM_COLS - 1 and bottom_row_has_one != []:
+			if indicator[curr_col, bot_row] != 1:
+				temp = np.copy(indicator[curr_col])
+				indicator[curr_col] = indicator[bottom_row_has_one[0]]
+				indicator[bottom_row_has_one[0]] = temp
+				# print("in between:", indicator, curr_col, left_col, bottom_row_has_one)
+			bottom_row_has_one.pop(0)
+			curr_col += 1
+		# print("indicator after row gravity:", indicator)
+		# for i in range(indicator_len):
+		# 	print(indicator[i][bot_row])
+		arr = [i for i in range(indicator.shape[0]) if indicator[i][bot_row] == 1]
+		if arr == []: break
+		right_col = max(arr)
+		# print("right_col", right_col)
+		while left_col < right_col:# and indicator[left_col][bot_row] == 1:
+			big_col_ind = left_col + biggestCol(indicator[left_col:right_col + 1, bot_row:]) 
+			temp = np.copy(indicator[left_col])
+			indicator[left_col] = indicator[big_col_ind]
+			indicator[big_col_ind] = temp
 			#gravity that boi
-			bottom_row_has_one = [i for i in range(left_col, indicator_wid) if indicator[i, bot_row] == 1]
-			curr_col = left_col
-			while curr_col < indicator_wid - 1 and bottom_row_has_one != []:
-				if indicator[curr_col, bot_row] != 1:
-					temp = np.copy(indicator[curr_col])
-					indicator[curr_col] = indicator[bottom_row_has_one[0]]
-					indicator[bottom_row_has_one[0]] = temp
-					# print("in between:", indicator, curr_col, left_col, bottom_row_has_one)
-				bottom_row_has_one.pop(0)
-				curr_col += 1
-			# print("indicator after row gravity:", indicator)
-			# for i in range(indicator_len):
-			# 	print(indicator[i][bot_row])
-			arr = [i for i in range(indicator.shape[0]) if indicator[i][bot_row] == 1]
-			if arr == []: break
-			right_col = max(arr)
-			# print("right_col", right_col)
-			while left_col < right_col:# and indicator[left_col][bot_row] == 1:
-				big_col_ind = left_col + biggestCol(indicator[left_col:right_col + 1, bot_row:]) 
-				temp = np.copy(indicator[left_col])
-				indicator[left_col] = indicator[big_col_ind]
-				indicator[big_col_ind] = temp
-				#gravity that boi
-				left_col_has_one = [i for i in range(threshold, indicator_len) if indicator[left_col][i] == 1]
-				curr_row = threshold
-				while curr_row < indicator_len - 1 and left_col_has_one != []:
-					if indicator[left_col][curr_row] != 1:
-						temp = np.copy(indicator[:, curr_row])
-						indicator[:, curr_row] = indicator[:, left_col_has_one[0]]
-						indicator[:, left_col_has_one[0]] = temp
-					left_col_has_one.pop(0)
-					curr_row += 1
-				threshold += 1
-				left_col += 1
-				# if threshold >= right_col:
-				# 	left_col = right_col + 1
-				# 	break
+			left_col_has_one = [i for i in range(threshold, NUM_ROWS) if indicator[left_col][i] == 1]
+			curr_row = threshold
+			while curr_row < NUM_ROWS - 1 and left_col_has_one != []:
+				if indicator[left_col][curr_row] != 1:
+					temp = np.copy(indicator[:, curr_row])
+					indicator[:, curr_row] = indicator[:, left_col_has_one[0]]
+					indicator[:, left_col_has_one[0]] = temp
+				left_col_has_one.pop(0)
+				curr_row += 1
+			threshold += 1
 			left_col += 1
-			bot_row = threshold
-		# remove empty rows
-		if indicator_len == indicator_wid:
-			trans = stringifyIndicator(indicator.T.tolist())
-			if trans in winForCurrPlayer.keys():
-				return trans
+			# if threshold >= right_col:
+			# 	left_col = right_col + 1
+			# 	break
+		left_col += 1
+		bot_row = threshold
+	if NUM_ROWS == NUM_COLS:
+		trans = stringifyIndicator(indicator.T.tolist())
+		if trans in winForCurrPlayerBeta.keys():
+			return trans
 	# if random() < .0001:
 	# 	print(indicator)
-	else: 
-		print("ERROR")
-		indicator = indicator.reshape((1, -1))
 	return stringifyIndicator(indicator.tolist())
 
 def nicePrint(arr):
@@ -234,13 +233,13 @@ def doTurn(circles, turn):
 				newBoard[column].remove(circle)
 	return newBoard
 
-winForCurrPlayer = {} # dict from board to (guarantee bool, (isWin wins, losses))
+winForCurrPlayerBeta = {} # dict from board to (guarantee bool, (wins, losses))
 
 def stringifyIndicator(indicator):
 	if indicator == []:
 		return "."
-	ans = str(len(indicator)) + ";" + str(len(indicator[0])) + ";"
-	# ans = ""
+	# ans = str(len(indicator)) + ";" + str(len(indicator[0])) + ";"
+	ans = ""
 	for col in indicator:
 		for circ in col:
 			ans += str(circ) # 0 or 1
@@ -259,54 +258,76 @@ def stringify(circles):
 counter = 0
 
 # def performPerfectTurnHelper(circles): #the perfect version, except for the part I screwed up.
-# 	circle_indicator = makeSymmetry(circles)
-# 	if circle_indicator in winForCurrPlayer.keys():
-# 		return winForCurrPlayer[circle_indicator]#means no false values
+# 	circle_indicator = makeSymmetryBeta(circles)
+# 	if circle_indicator in winForCurrPlayerBeta.keys():
+# 		return winForCurrPlayerBeta[circle_indicator]#means no false values
 # 	legal_moves = getLegalMoves(circles)
 # 	for move in legal_moves:
 # 		newBoard = doTurn(circles, move)
 # 		if not performComputerTurnHelper(newBoard, num_moves - 1):
-# 			winForCurrPlayer[circle_indicator] = True
+# 			winForCurrPlayerBeta[circle_indicator] = True
 # 			return True
-# 	winForCurrPlayer[circle_indicator] = False
+# 	winForCurrPlayerBeta[circle_indicator] = False
 # 	return False
 
-def performComputerTurnHelper(circles, num_moves):
-	circle_indicator = makeSymmetry(circles)
-	if circle_indicator in winForCurrPlayer.keys() and winForCurrPlayer[circle_indicator][0]:
-		return winForCurrPlayer[circle_indicator][1][1] == 0 #means no false values
+counting = 0
+
+def performComputerTurnBetaHelper(circles, num_moves):
+	# global counting
+	# counting += 1
+	circle_indicator = makeSymmetryBeta(circles)
+	if circle_indicator in winForCurrPlayerBeta.keys() and winForCurrPlayerBeta[circle_indicator][0]:
+		return winForCurrPlayerBeta[circle_indicator][1][1] == 0, True #means no false values
 	if num_moves == 0:
-		print("error1")
-		if circle_indicator in winForCurrPlayer.keys():
-			_, (win, loss) = winForCurrPlayer[circle_indicator] #isSure is necessarily false here.
-			ans = beta.pdf(win, loss)
+		if circle_indicator in winForCurrPlayerBeta.keys():
+			# print("doing Beta")
+			_, (win, loss) = winForCurrPlayerBeta[circle_indicator] #isSure is necessarily false here.
+			# print(win, loss)
+			ans = np.random.beta(win, loss)
 		else:
-			ans = beta.pdf(1, 1)
-		return ans
+			ans = np.random.beta(1, 1)
+		# print(ans)
+		return ans, False
 	legal_moves = getLegalMoves(circles)
+	shuffle(legal_moves)
 	max_win_prob = 0
+	checksLeft = MOVES_TO_CHECK
+	unsure = False
+	bigIsSure = True
 	for move in legal_moves:
 		newBoard = doTurn(circles, move)
-		move_win_prob = 1 - performComputerTurnHelper(newBoard, num_moves - 1)
+		result, isSure = performComputerTurnBetaHelper(newBoard, num_moves - 1)
+		move_win_prob = 1 - result
+		if not isSure:
+			bigIsSure = False
 		if move_win_prob > max_win_prob:
-			if move_win_prob == 1:
-				winForCurrPlayer[circle_indicator] = True, (1, 0)
-				return 1
-			else:
-				print("error3")
-				max_win_prob = move_win_prob
-	if max_win_prob == 0:
-		winForCurrPlayer[circle_indicator] = False, (0, 1)
-	else:
-		print("error4")
-	return max_win_prob
+			if move_win_prob >threshold:
+				if isSure:
+					# print("trigger2")
+					# print(circle_indicator, "True")
+					winForCurrPlayerBeta[circle_indicator] = True, [1, 0]
+				return move_win_prob, isSure
+			# else:
+				# print("error3")
+			max_win_prob = move_win_prob
+		checksLeft -= 1
+		# if checksLeft == 0:
+		# 	return max_win_prob, False
+	if max_win_prob == 0 and bigIsSure:
+		# print("trigger1")
+		# print(circle_indicator, "False")
+		winForCurrPlayerBeta[circle_indicator] = True, [0, 1]
+	# else:
+		# print("error4")
+	return max_win_prob, bigIsSure
 
 """
 next Feature: have the computer play itself, one looks up to 10 moves forward then does some random analysis or something, the other looks like 11 or soemthing.
 """
 
-def performComputerTurnPerfect(circles, winner_predict, win, compTurn):
+def performComputerTurnBeta(circles, winner_predict, win, compTurn):
 	global Total_time
+	
 	# time.sleep(1) 
 	# return True, choice(getLegalMoves(circles))
 	start_time = time.time()
@@ -316,30 +337,48 @@ def performComputerTurnPerfect(circles, winner_predict, win, compTurn):
 	max_win_move = None
 	max_new_circles = None
 	legalMoves = getLegalMoves(circles)
+	shuffle(legalMoves)
+	tempCount = 0
+	checksLeft = MOVES_TO_CHECK
+	circ_ind = makeSymmetryBeta(circles)
+	winning = circ_ind in winForCurrPlayerBeta.keys() and winForCurrPlayerBeta[circ_ind][0] and winForCurrPlayerBeta[circ_ind][1][0] == 1
+	# if circ_ind in winForCurrPlayerBeta.keys():
+	# 	print(winning, winForCurrPlayerBeta[circ_ind])
+	# if winning:
+		# print("-------")
+		# print(circ_ind)
+		# print(compTurn)
 	for move in legalMoves:
 		newCircles = doTurn(circles, move)
-		winProb = 1 - performComputerTurnHelper(newCircles, 100)
-		if winProb == 1:
+		winProb = 1 - performComputerTurnBetaHelper(newCircles, MAX_DEPTH)[0]
+		if winProb > threshold:
 			# loading.undraw()
 			winner_predict.setText("Computer will win!" if compTurn else "Player will win!")
 			Total_time += time.time() - start_time
 			# print("--- %s seconds ---" % (time.time() - start_time))
-			# winForCurrPlayer[stringifyIndicator(getIndicatorArray(circles))] = True, (1, 0)
+			# winForCurrPlayerBeta[stringifyIndicator(getIndicatorArray(circles))] = True, (1, 0)
 			return 1, move
-		if winProb != 0:
-			print("Error2")
+		# if winProb != 0:
+			# print("Error2")
 		if max_win_prob < winProb:
 			max_win_prob = winProb
 			max_win_move = move
 			max_new_circles = newCircles
+		checksLeft -= 1
+		if checksLeft == 0 and not winning:
+			break
+		# if checksLeft < 0:
+			# print("it's working.")
 	# loading.undraw()
+	if winning:
+		print("Should be one but isn't")
 	if max_win_prob == 0:
 		winner_predict.setText("Player will win!" if compTurn else "Computer will win!")
 	elif max_win_move != None:
 		if compTurn:
-			computer_moves.append(max_new_circles)
+			computer_moves.append(makeSymmetryBeta(max_new_circles))
 		else:
-			player_moves.append(max_new_circles)
+			player_moves.append(makeSymmetryBeta(max_new_circles))
 	Total_time += time.time() - start_time
 	# print(counter)
 	return max_win_prob, max_win_move
@@ -368,11 +407,15 @@ def performComputerTurnPerfect(circles, winner_predict, win, compTurn):
 
 def addResults(boards, isWin):
 	for board in boards:
-		temp = winForCurrPlayer.get(board, (False, (1, 1)))
+		# print("damn")
+		temp = winForCurrPlayerBeta.get(board, (False, [1, 1]))
 		# print(temp)
-		temp[1][isWin] += 1
-		winForCurrPlayer[board] = temp
-		# print(winForCurrPlayer[board])
+		if not temp[0]:
+			temp[1][1 - isWin] += 1
+			winForCurrPlayerBeta[board] = temp
+		else:
+			print("better")
+		# print(winForCurrPlayerBeta[board])
 
 """
 general gameplay
@@ -405,9 +448,10 @@ def playGame():
 	average_time_text = Text(Point(NUM_COLS * SQUARE_WIDTH // 2, SCREEN_HEIGHT - 33), "Average Time: 0")
 	average_time_text.draw(win)
 	total_runs = 0
-	while(True):		
+	while(True):
+		# print(counting)
 		FIRST_MOVE = True
-		winForCurrPlayer.clear()
+		# winForCurrPlayerBeta.clear()
 		if total_runs > 0:
 			average_time_text.setText("Average Time: " + str(Total_time / total_runs))
 		total_runs += 1
@@ -419,9 +463,9 @@ def playGame():
 		# tiles_removed = 0
 		# row_selection = -1
 		# col_selection = -1
-		# makeSymmetry(getIndicatorArray(circles))
+		# makeSymmetryBeta(getIndicatorArray(circles))
 		# if COMPUTER_FIRST:
-		# 	comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win, )
+		# 	comp_win, moves = performComputerTurnBeta(circles, winner_predict, win, )
 		# 	if not comp_win:
 		# 		moves = choice(getLegalMoves(circles))
 		# 	for move in moves:
@@ -441,12 +485,16 @@ def playGame():
 			# 	player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
 
 		while circles != [[] for i in range(NUM_COLS)]:
-			# if player_turn:
-			is_win, moves = performComputerTurnPerfect(circles, winner_predict, win, not player_turn)
-			# else:
-			# 	is_win, moves = performComputerTurnPerfect(circles, winner_predict, win)
-			if moves is None:
-				moves = choice(getLegalMoves(circles))
+			if circleCount(circles) > NUM_COLS * NUM_ROWS / 5 and useRandSpeedUP:
+				moves = getRandomMove(circles)
+			else:
+				if player_turn:
+					is_win, moves = performComputerTurnBeta(circles, winner_predict, win, not player_turn)
+				else:
+					is_win, moves = performComputerTurnBeta(circles, winner_predict, win, not player_turn)
+				if moves is None:
+					moves = choice(getLegalMoves(circles))
+				# print(moves)
 			for move in moves:
 				row, col = circToArrayIndex(move)
 				circles[col].remove(move)
@@ -464,8 +512,8 @@ def playGame():
 			# 		player_text.setText("Player's turn" if player_1_turn else "Computer's turn")
 			# 		row_selection = -1
 			# 		col_selection = -1
-			# 		# makeSymmetry(getIndicatorArray(circles))
-			# 		comp_win, moves = performComputerTurnPerfect(circles, winner_predict, win)
+			# 		# makeSymmetryBeta(getIndicatorArray(circles))
+			# 		comp_win, moves = performComputerTurnBeta(circles, winner_predict, win)
 			# 		if not comp_win:
 			# 			moves = choice(getLegalMoves(circles))
 			# 		for move in moves:
@@ -501,7 +549,8 @@ def playGame():
 			# 				circ.undraw()
 			# 				break
 		# print("did it")
-		# print(winForCurrPlayer)
+		print(Total_getMove_time / total_runs)
+		# print(winForCurrPlayerBeta)
 		if not player_turn: #actually means the player just moved, i.e. won
 			player_1_wins += 1
 			player_1_win_text.setText("Player wins: " + str(player_1_wins))
@@ -512,10 +561,16 @@ def playGame():
 			player_2_win_text.setText("Computer wins: " + str(player_2_wins))
 			addResults(player_moves, 0)
 			addResults(computer_moves, 1)
+		printSureness()
 		player_moves = []
 		computer_moves = []
 	win.getMouse()
 	win.close()
+
+def printSureness():
+	known = sum([1 for board in winForCurrPlayerBeta if winForCurrPlayerBeta[board][0]])
+	print(known / len(winForCurrPlayerBeta.keys()))
+	print(known)
 
 """
 various Helper Methods
@@ -543,6 +598,8 @@ def getIndicatorArray(circles):
 	return(array)	
 
 def getLegalMoves(circles):
+	global Total_getMove_time
+	start_time = time.time()
 	array = getIndicatorArray(circles)
 	output = []
 	#EVERY ROW
@@ -604,10 +661,36 @@ def getLegalMoves(circles):
 	# for move in output_final:
 	# 	print(move)
 	# time.sleep(1)
+	Total_getMove_time += time.time() - start_time
 	return output_final
 
+def getRandomMove(circles):
+	indicator = np.array(getIndicatorArray(circles))
+	print(indicator)
+	if random() < .5:
+		col = -1
+		while col == -1 or sum(indicator[col]) == 0:
+			col = int(floor(random() * len(indicator)))
+		pick = []
+		while pick == []:
+			pick = [i for i in range(indicator.shape[1]) if indicator[col, i] == 1 and random() < 0.5]
+		print(pick)
+		ret = [arrayIndexToCirc(i, col, circles) for i in pick]
+	else:
+		row = -1
+		while row == -1 or sum(indicator[:, row]) == 0:
+			row = int(floor(random() * len(indicator[0])))
+		pick = []
+		while pick == []:
+			pick = [i for i in range(indicator.shape[0]) if indicator[i, row] == 1 and random() < 0.5]
+		print(pick)
+		ret = [arrayIndexToCirc(row, i, circles) for i in pick]
+	print(ret)
+	return ret
 
 if __name__ == "__main__":
+	seed(10)
+	np.random.seed(100)
 	playGame()
 
 
